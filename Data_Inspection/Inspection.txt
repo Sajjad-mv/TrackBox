@@ -1,0 +1,105 @@
+==================================================
+Inspecting match_1
+==================================================
+Loaded match match_1:
+  Home data shape: (56466, 33)
+  Away data shape: (56466, 33)
+  Ball data present in home file: True
+  Ball data present in away file: True
+
+Coordinate ranges (in cm, centered at [0,0]):
+  Home X: [-5500.0, 5530.0]
+  Home Y: [-3810.0, 3630.0]
+  Away X: [-5530.0, 5540.0]
+  Away Y: [-3680.0, 3610.0]
+
+Ball coordinate ranges:
+  Ball X: [-5250.0, 5250.0]
+  Ball Y: [-3810.0, 3620.0]
+
+Match periods: [1, 2]
+Time range: 0 to 294220
+
+==================================================
+Inspecting match_2
+==================================================
+Loaded match match_2:
+  Home data shape: (57206, 33)
+  Away data shape: (57206, 33)
+  Ball data present in home file: True
+  Ball data present in away file: True
+
+Coordinate ranges (in cm, centered at [0,0]):
+  Home X: [-5490.0, 5610.0]
+  Home Y: [-3720.0, 3610.0]
+  Away X: [-5390.0, 5430.0]
+  Away Y: [-3700.0, 3600.0]
+
+Ball coordinate ranges:
+  Ball X: [-5390.0, 31082.0]
+  Ball Y: [-3690.0, 31082.0]
+
+Match periods: [1, 2]
+Time range: 0 to 301920
+
+==================================================
+Inspecting match_3
+==================================================
+Loaded match match_3:
+  Home data shape: (57714, 33)
+  Away data shape: (57713, 33)
+  Ball data present in home file: True
+  Ball data present in away file: True
+
+Coordinate ranges (in cm, centered at [0,0]):
+  Home X: [-5780.0, 5580.0]
+  Home Y: [-3880.0, 3730.0]
+  Away X: [-5830.0, 5390.0]
+  Away Y: [-3800.0, 3760.0]
+
+Ball coordinate ranges:
+  Ball X: [-5270.0, 5250.0]
+  Ball Y: [-3870.0, 3740.0]
+
+Match periods: [1, 2]
+Time range: 0 to 306820
+
+==================================================
+Inspecting match_4
+==================================================
+Loaded match match_4:
+  Home data shape: (56717, 33)
+  Away data shape: (56717, 33)
+  Ball data present in home file: True
+  Ball data present in away file: True
+
+Coordinate ranges (in cm, centered at [0,0]):
+  Home X: [-5640.0, 5540.0]
+  Home Y: [-3710.0, 3960.0]
+  Away X: [-5460.0, 5770.0]
+  Away Y: [-4020.0, 3660.0]
+
+Ball coordinate ranges:
+  Ball X: [-5260.0, 5260.0]
+  Ball Y: [-3670.0, 3570.0]
+
+Match periods: [1, 2]
+Time range: 0 to 290220
+
+==================================================
+Inspecting match_5
+==================================================
+Loaded match match_5:
+  Home data shape: (57735, 31)
+  Away data shape: (57734, 31)
+  Ball data present in home file: False
+  Ball data present in away file: False
+
+Coordinate ranges (in cm, centered at [0,0]):
+  Home X: [-5530.0, 5400.0]
+  Home Y: [-4020.0, 3710.0]
+  Away X: [-5570.0, 5540.0]
+  Away Y: [-3760.0, 3710.0]
+
+Match periods: [1, 2]
+Time range: 0 to 299620
