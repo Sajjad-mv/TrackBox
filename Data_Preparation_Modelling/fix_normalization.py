@@ -14,7 +14,7 @@ def load_and_preprocess_data(csv_path):
     df = pd.read_csv(csv_path)
     
     # Sort by time to ensure sequences are in order
-    df = df.sort_values(by=['Match_ID', 'Time'])
+    df = df.sort_values(by=['IdPeriod', 'Time'])
     
     return df
 
