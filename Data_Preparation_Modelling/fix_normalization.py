@@ -157,7 +157,7 @@ def create_distance_adjacency(df, num_nodes=29, threshold=20.0):
     print(f"Final adjacency matrix shape: {full_adj.shape}")
     return full_adj
     
-def prepare_sequences(node_features, seq_length=200, pred_length=200):
+def prepare_sequences(node_features, seq_length=4, pred_length=1):
     """
     Create sequences of data for MTGNN model
     Args:
