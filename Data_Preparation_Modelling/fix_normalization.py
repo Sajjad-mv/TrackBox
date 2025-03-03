@@ -1,174 +1,137 @@
+# simple_norm_fix.py - Direct implementation without generating other files
 import pandas as pd
 import numpy as np
-import os
 import torch
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+import os
 
-# 1. Load and preprocess the data
 def load_and_preprocess_data(csv_path):
-    """
-    Load the football tracking data and preprocess it for MTGNN model
-    """
-    # Load CSV
+    """Load and preprocess data"""
     df = pd.read_csv(csv_path)
-    
-    # Sort by time to ensure sequences are in order
     df = df.sort_values(by=['IdPeriod', 'Time'])
-    
     return df
 
-# 2. Feature extraction and node definition
-def extract_features(df):
-    """
-    Extract relevant features for each node (players and ball)
-    """
-    # Define nodes: home players + away players + 1 ball
-    
-    # Extract features for each node
+def extract_features_fixed(df, test_mode=False, saved_scalers=None):
+    """Extract features with proper normalization handling"""
     node_features = []
-    home_players = 0
-    away_players = 0
+    scalers = [] if saved_scalers is None else saved_scalers
     
-    print("Extracting features for each node...")
-    
-    # Home players
-    for i in range(1, 15):  # From the data structure, it seems there are up to 14 players
+    # Extract home players
+    for i in range(1, 15):
         if f'home_{i}_x' in df.columns and f'home_{i}_y' in df.columns:
-            # For each player, extract position and distance to ball
             player_features = df[[
                 f'home_{i}_x', 
                 f'home_{i}_y',
                 f'home_{i}_DistanceToBall'
             ]]
-            node_features.append(player_features)
-            home_players += 1
+            
+            # Handle normalization properly
+            if test_mode and saved_scalers:
+                # Use saved scaler for test data
+                scaler_idx = len(node_features)
+                if scaler_idx < len(saved_scalers):
+                    scaler = saved_scalers[scaler_idx]
+                    normalized = pd.DataFrame(
+                        scaler.transform(player_features.fillna(0)), 
+                        columns=player_features.columns
+                    )
+                else:
+                    # Fallback if scaler missing
+                    normalized = player_features.fillna(0)
+            else:
+                # Create new scaler for training data
+                scaler = StandardScaler()
+                normalized = pd.DataFrame(
+                    scaler.fit_transform(player_features.fillna(0)), 
+                    columns=player_features.columns
+                )
+                scalers.append(scaler)
+            
+            node_features.append(normalized)
     
-    print(f"Found {home_players} home players")
-    
-    # Away players
+    # Extract away players (same pattern)
     for i in range(1, 15):
         if f'away_{i}_x' in df.columns and f'away_{i}_y' in df.columns:
-            # For each player, extract position and distance to ball
             player_features = df[[
                 f'away_{i}_x', 
                 f'away_{i}_y',
                 f'away_{i}_DistanceToBall'
             ]]
-            node_features.append(player_features)
-            away_players += 1
+            
+            # Handle normalization properly
+            if test_mode and saved_scalers:
+                # Use saved scaler for test data
+                scaler_idx = len(node_features)
+                if scaler_idx < len(saved_scalers):
+                    scaler = saved_scalers[scaler_idx]
+                    normalized = pd.DataFrame(
+                        scaler.transform(player_features.fillna(0)), 
+                        columns=player_features.columns
+                    )
+                else:
+                    # Fallback if scaler missing
+                    normalized = player_features.fillna(0)
+            else:
+                # Create new scaler for training data
+                scaler = StandardScaler()
+                normalized = pd.DataFrame(
+                    scaler.fit_transform(player_features.fillna(0)), 
+                    columns=player_features.columns
+                )
+                scalers.append(scaler)
+            
+            node_features.append(normalized)
     
-    print(f"Found {away_players} away players")
-    
-    # Check if we have the ball columns
+    # Extract ball features
     ball_columns = ['ball_x_Home', 'ball_y_Home', 'Ball_Speed', 'Ball_Acceleration', 'Ball_Direction_Degrees']
-    missing_columns = [col for col in ball_columns if col not in df.columns]
+    ball_columns = [col for col in ball_columns if col in df.columns]
     
-    if missing_columns:
-        print(f"Warning: Missing ball columns: {missing_columns}")
-        # Use only available ball columns
-        ball_columns = [col for col in ball_columns if col in df.columns]
-    
-    # Ball - using both home and away perspectives
     if ball_columns:
         ball_features = df[ball_columns]
-        node_features.append(ball_features)
-        print("Added ball node with features:", ball_columns)
-    else:
-        print("Warning: No ball features found in the dataset")
-    
-    # Print information about the extracted features
-    total_nodes = home_players + away_players + (1 if ball_columns else 0)
-    print(f"Total nodes extracted: {total_nodes}")
-    
-    for i, features in enumerate(node_features):
-        node_type = "Home player" if i < home_players else "Away player" if i < home_players + away_players else "Ball"
-        print(f"Node {i} ({node_type}): {features.shape[1]} features, {features.shape[0]} time steps")
-    
-    # Normalize features to have similar scales
-    print("Normalizing features...")
-    normalized_features = []
-    scaling_stats = []
-    
-    for features in node_features:
-        # Handle missing data by filling with 0
-        features = features.fillna(0)
         
-        # Apply normalization
-        scaler = StandardScaler()
-        normalized = pd.DataFrame(
-            scaler.fit_transform(features), 
-            columns=features.columns
-        )
-        normalized_features.append(normalized)
-
-        for col, mean, std in zip(features.columns, scaler.mean_, scaler.scale_):
-            scaling_stats.append(f"{col}, Mean: {mean}, Std: {std}")
-
-    
-    with open("scaling_stats.txt", "w") as f:
-        f.write("\n".join(scaling_stats))
-
-    print("Saved normalization stats to scaling_stats.txt")
-    
-    return normalized_features
-
-# 3. Create adjacency matrix based on player distances
-
-
-def create_player_only_adjacency(df, num_players=28, threshold=None):
-    '''
-    Fixed version that handles None threshold
-    '''
-    print(f"Creating player-only adjacency matrix for {num_players} players")
-    
-    # If threshold is None, use a default value
-    if threshold is None:
-        threshold = 20.0
+        # Handle normalization properly
+        if test_mode and saved_scalers:
+            # Use saved scaler for test data
+            scaler_idx = len(node_features)
+            if scaler_idx < len(saved_scalers):
+                scaler = saved_scalers[scaler_idx]
+                normalized = pd.DataFrame(
+                    scaler.transform(ball_features.fillna(0)), 
+                    columns=ball_features.columns
+                )
+            else:
+                # Fallback if scaler missing
+                normalized = ball_features.fillna(0)
+        else:
+            # Create new scaler for training data
+            scaler = StandardScaler()
+            normalized = pd.DataFrame(
+                scaler.fit_transform(ball_features.fillna(0)), 
+                columns=ball_features.columns
+            )
+            scalers.append(scaler)
         
-    # Rest of function is unchanged
-    # [Original implementation continues]
-def create_distance_adjacency(df, num_nodes=29, threshold=20.0):
-    '''
-    Create an adjacency matrix for MTGNN graph construction.
-    Now improved to focus on player relationships only.
+        node_features.append(normalized)
+        
+        # Special handling for prediction target (ball x,y)
+        # Save ball position scaler separately for denormalization
+        if not test_mode:
+            ball_pos_scaler = StandardScaler()
+            ball_pos_scaler.fit(df[['ball_x_Home', 'ball_y_Home']].fillna(0))
+            scalers.append(('ball_pos', ball_pos_scaler))
     
-    Args:
-        df: DataFrame with player and ball data
-        num_nodes: Total nodes (29 - 28 players + 1 ball)
-        threshold: Distance threshold for connections
-    
-    Returns:
-        Adjacency matrix tensor (compatible with MTGNN)
-    '''
-    # For MTGNN compatibility, we need a matrix that includes the ball position node
-    # But we'll construct the graph based on player relationships only
-    
-    # Create player-only adjacency (28x28)
-    player_adj = create_player_only_adjacency(df, num_players=28, threshold=threshold)
-    
-    # For compatibility with existing code, expand to include ball node
-    # The ball isn't structurally part of the graph but included for compatibility
-    full_adj = torch.ones(num_nodes, num_nodes)
-    
-    # Copy player adjacency to top-left corner
-    full_adj[:28, :28] = player_adj
-    
-    print(f"Final adjacency matrix shape: {full_adj.shape}")
-    return full_adj
-    
-def prepare_sequences(node_features, seq_length=4, pred_length=1):
+    return node_features, scalers
+
+def prepare_sequences(node_features, seq_length=4):
     """
     Create sequences of data for MTGNN model
-    Args:
-        node_features: List of dataframes with features for each node
-        seq_length: Length of input sequence
-        pred_length: How many steps ahead to predict
     """
     sequences = []
     targets_ball_x = []
     targets_ball_y = []
-    targets_possession = []
     
     # Ensure all node features have the same length
     min_length = min([len(df) for df in node_features])
@@ -178,7 +141,7 @@ def prepare_sequences(node_features, seq_length=4, pred_length=1):
     print(f"Feature dimensions per node: {feature_dims}")
     
     # Number of valid sequences
-    num_sequences = min_length - seq_length - pred_length + 1
+    num_sequences = min_length - seq_length - 1 + 1  # pred_length=1
     print(f"Creating {num_sequences} sequences with length {seq_length}")
     
     for i in range(num_sequences):
@@ -196,7 +159,7 @@ def prepare_sequences(node_features, seq_length=4, pred_length=1):
         # Prepare target values (ball position and possession)
         # Assuming the ball is the last node and its first two features are x, y
         ball_node_idx = len(node_features) - 1
-        target_idx = i + seq_length + pred_length - 1
+        target_idx = i + seq_length  # prediction 1 step ahead
         
         # For ball position - last node's position features
         ball_x = node_features[ball_node_idx].iloc[target_idx, 0]  # x-position
@@ -223,10 +186,11 @@ def prepare_sequences(node_features, seq_length=4, pred_length=1):
             padded_seq[node_idx, :num_features, :] = node_seq.T
         
         # Now transpose to get [features, nodes, sequence]
-        transposed = np.transpose(padded_seq, (1, 0, 2))
+        transposed = np.transpose(padded_seq, (2, 0, 1))
         formatted_sequences.append(transposed)
     
     X = np.array(formatted_sequences)
+    X = np.transpose(X, (0, 3, 2, 1))
     y_ball_x = np.array(targets_ball_x)
     y_ball_y = np.array(targets_ball_y)
     
@@ -234,64 +198,316 @@ def prepare_sequences(node_features, seq_length=4, pred_length=1):
     
     return X, y_ball_x, y_ball_y
 
-# 5. Split data into train/validation/test sets
-def split_data(X, y_ball_x, y_ball_y, train_ratio=0.7, val_ratio=0.15):
+def prepare_football_data_fixed(csv_path, seq_length=4, train_ratio=0.8):
     """
-    Split data into training, validation and test sets
+    Pipeline with proper normalization handling
     """
-    # First split into train and temp
-    X_train, X_temp, y_ball_x_train, y_ball_x_temp, y_ball_y_train, y_ball_y_temp = train_test_split(
-        X, y_ball_x, y_ball_y, test_size=(1 - train_ratio), random_state=42
+    # Load data
+    df = pd.read_csv(csv_path)
+    df = df.sort_values(by=['IdPeriod', 'Time'])
+    
+    # First split into train and test sets - BEFORE normalization
+    train_size = int(len(df) * train_ratio)
+    df_train = df.iloc[:train_size]
+    df_test = df.iloc[train_size:]
+    
+    print(f"Split data: train={len(df_train)} rows, test={len(df_test)} rows")
+    
+    # Process training data and save scalers
+    train_features, scalers = extract_features_fixed(df_train)
+    
+    # Save scalers for later use
+    torch.save(scalers, "feature_scalers.pt")
+    print(f"Saved {len(scalers)} scalers for denormalization")
+    
+    # Extract ball position scalers for target denormalization
+    ball_pos_scaler = None
+    for item in scalers:
+        if isinstance(item, tuple) and item[0] == 'ball_pos':
+            ball_pos_scaler = item[1]
+            break
+    
+    # If no special ball scaler found, use the ball node scaler
+    if ball_pos_scaler is None and len(scalers) >= 29:  # 28 players + ball
+        ball_pos_scaler = scalers[28]  # Ball should be the last node
+        
+    # Save key normalization parameters for ball position
+    if ball_pos_scaler:
+        with open("ball_pos_norm_params.txt", "w") as f:
+            f.write(f"ball_x_mean: {ball_pos_scaler.mean_[0]}\n")
+            f.write(f"ball_x_std: {ball_pos_scaler.scale_[0]}\n")
+            f.write(f"ball_y_mean: {ball_pos_scaler.mean_[1]}\n")
+            f.write(f"ball_y_std: {ball_pos_scaler.scale_[1]}\n")
+        print("Saved ball position normalization parameters")
+    
+    # Process test data using same scalers
+    test_features, _ = extract_features_fixed(df_test, test_mode=True, saved_scalers=scalers)
+    
+    # Prepare sequences for training data
+    X_train, y_ball_x_train, y_ball_y_train = prepare_sequences(train_features, seq_length)
+    
+    # Prepare sequences for test data
+    X_test, y_ball_x_test, y_ball_y_test = prepare_sequences(test_features, seq_length)
+    
+    # Create basic validation set from training data
+    X_train, X_val, y_ball_x_train, y_ball_x_val, y_ball_y_train, y_ball_y_val = train_test_split(
+        X_train, y_ball_x_train, y_ball_y_train, test_size=0.15, random_state=42
     )
     
-    # Then split temp into validation and test
-    test_ratio = 1 - train_ratio - val_ratio
-    val_test_ratio = val_ratio / (val_ratio + test_ratio)
+    # Save test data for evaluation
+    torch.save(X_test, "test_data.pt")
+    torch.save((y_ball_x_test, y_ball_y_test), "test_targets.pt")
     
-    X_val, X_test, y_ball_x_val, y_ball_x_test, y_ball_y_val, y_ball_y_test = train_test_split(
-        X_temp, y_ball_x_temp, y_ball_y_temp, test_size=(1 - val_test_ratio), random_state=42
-    )
-    
+    # Return everything needed
     return (
-        X_train, X_val, X_test, 
-        y_ball_x_train, y_ball_x_val, y_ball_x_test,
-        y_ball_y_train, y_ball_y_val, y_ball_y_test
+        (X_train, X_val, X_test, y_ball_x_train, y_ball_x_val, y_ball_x_test, y_ball_y_train, y_ball_y_val, y_ball_y_test),
+        scalers
     )
 
-# 6. Main function to prepare data for MTGNN
-def prepare_football_data_for_mtgnn(csv_path, seq_length=200, pred_length=200, use_threshold=False):
-    """
-    Complete pipeline to prepare football tracking data for MTGNN model
-    """
-    try:
-        # Load and preprocess data
-        print("Step 1: Loading and preprocessing data...")
-        df = load_and_preprocess_data(csv_path)
-        
-        # Extract features for each node
-        print("Step 2: Extracting features for each node...")
-        node_features = extract_features(df)
-        
-        if not node_features:
-            raise ValueError("No node features extracted. Check if player and ball data exists in the dataset.")
+def denormalize_predictions(predictions, norm_params_file=None):
+    """Denormalize predictions using saved parameters"""
+    # Try to load saved scalers first
+    if os.path.exists("feature_scalers.pt"):
+        try:
+            scalers = torch.load("feature_scalers.pt")
+            # Find ball position scaler
+            ball_pos_scaler = None
+            for item in scalers:
+                if isinstance(item, tuple) and item[0] == 'ball_pos':
+                    ball_pos_scaler = item[1]
+                    break
+            
+            # If found, use it
+            if ball_pos_scaler:
+                print("Using saved ball position scaler")
+                return ball_pos_scaler.inverse_transform(predictions)
+        except:
+            print("Could not use saved scalers")
+    
+    # Fallback to manual parameters
+    if norm_params_file and os.path.exists(norm_params_file):
+        try:
+            # Read parameters
+            params = {}
+            with open(norm_params_file, 'r') as f:
+                for line in f:
+                    key, value = line.strip().split(': ')
+                    params[key] = float(value)
+            
+            # Apply denormalization
+            x_mean = params.get('ball_x_mean', 0)
+            x_std = params.get('ball_x_std', 1)
+            y_mean = params.get('ball_y_mean', 0)
+            y_std = params.get('ball_y_std', 1)
+            
+            denorm_predictions = predictions.copy()
+            denorm_predictions[:, 0] = predictions[:, 0] * x_std + x_mean  # x
+            denorm_predictions[:, 1] = predictions[:, 1] * y_std + y_mean  # y
+            
+            print(f"Denormalized using parameters from {norm_params_file}")
+            return denorm_predictions
+        except Exception as e:
+            print(f"Error using norm params file: {str(e)}")
+    
+    print("WARNING: Could not denormalize predictions")
+    return predictions
+
+def train_model():
+    """Train model with proper normalization"""
+    from model_training import run_football_prediction_pipeline
+    
+    # Check for CUDA
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    # Set random seeds
+    np.random.seed(42)
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(42)
+    
+    # Prepare data with proper normalization
+    print("Preparing data with proper normalization...")
+    csv_path = 'match_1_Features.csv'
+    data_splits, scalers = prepare_football_data_fixed(csv_path, seq_length=4)
+    
+    # Create fixed adjacency matrix 
+    print("Creating adjacency matrix...")
+    num_nodes = data_splits[0].shape[2]  # X_train
+    adj_matrix = torch.ones(num_nodes, num_nodes)
+    
+    # Train model
+    print("Training model...")
+    batch_size = 32
+    epochs = 20
+    
+    model, results, metrics = run_football_prediction_pipeline(
+        data_splits,
+        adj_matrix=adj_matrix,
+        node_features=None,  # Not needed in this version
+        batch_size=batch_size,
+        epochs=epochs,
+        device=device
+    )
+    
+    # Save model
+    torch.save(model.state_dict(), "fixed_trained_model.pth")
+    print("Model saved to fixed_trained_model.pth")
+    
+    print("Training complete!")
+
+def evaluate_model():
+    """Evaluate model with proper denormalization and NaN handling"""
+    from model_training import initialize_mtgnn_model
+    import numpy as np
+    
+    # Check for CUDA
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    # Load test data
+    if not os.path.exists("test_data.pt") or not os.path.exists("test_targets.pt"):
+        print("Test data not found. Please run training first.")
+        return
+    
+    X_test = torch.load("test_data.pt")
+    y_ball_x_test, y_ball_y_test = torch.load("test_targets.pt")
+    
+    # Load model
+    model_path = "fixed_trained_model.pth"
+    if not os.path.exists(model_path):
+        print(f"Model file {model_path} not found")
+        return
+    
+    # Create model with same architecture
+    _, in_dim, num_nodes, seq_length = X_test.shape
+    model = initialize_mtgnn_model(num_nodes, in_dim, seq_length, device)
+    model.load_state_dict(torch.load(model_path))
+    
+    # Make predictions
+    model.eval()
+    with torch.no_grad():
+        # Convert to tensor
+        test_tensor = torch.FloatTensor(X_test).to(device)
         
         # Create adjacency matrix
-        print("Step 3: Creating adjacency matrix...")
-        threshold = 20 if use_threshold else None  # Arbitrary threshold, adjust as needed
-        adj_matrix = create_distance_adjacency(df, len(node_features), threshold)
+        adj_matrix = torch.ones(num_nodes, num_nodes).to(device)
         
-        # Prepare sequences
-        print("Step 4: Preparing sequences...")
-        X, y_ball_x, y_ball_y = prepare_sequences(node_features, seq_length, pred_length)
+        # Forward pass
+        outputs = model(test_tensor, A_tilde=adj_matrix)
         
-        # Split data
-        print("Step 5: Splitting data into train/val/test sets...")
-        splits = split_data(X, y_ball_x, y_ball_y)
+        # Extract ball node prediction
+        ball_outputs = outputs[:, :, -1, :].mean(dim=-1)  # [batch_size, out_dim]
+        predictions = ball_outputs.cpu().numpy()
+    
+    # Prepare actual targets
+    targets = np.column_stack((y_ball_x_test, y_ball_y_test))
+    
+    # Calculate normalized metrics
+    mse_norm = mean_squared_error(targets, predictions)
+    mae_norm = mean_absolute_error(targets, predictions)
+    
+    print(f"Normalized metrics:")
+    print(f"MSE: {mse_norm:.6f}")
+    print(f"MAE: {mae_norm:.6f}")
+    
+    # Denormalize predictions
+    denorm_predictions = denormalize_predictions(predictions, "ball_pos_norm_params.txt")
+    
+    # Load original data for comparison
+    csv_path = "match_1_Features.csv"
+    df = pd.read_csv(csv_path)
+    df = df.sort_values(by=['IdPeriod', 'Time'])
+    
+    # Get test portion
+    train_ratio = 0.8
+    train_size = int(len(df) * train_ratio)
+    df_test = df.iloc[train_size:]
+    
+    # Extract actual ball positions (accounting for sequence length)
+    seq_length = 4
+    ball_positions = df_test[['ball_x_Home', 'ball_y_Home']].values[seq_length:seq_length+len(predictions)]
+    
+    # Check for NaN values in both arrays and create masks
+    print(f"Checking for NaN values:")
+    has_nan_ball = np.isnan(ball_positions).any()
+    has_nan_pred = np.isnan(denorm_predictions).any()
+    print(f"NaN in ball_positions: {has_nan_ball}")
+    print(f"NaN in denorm_predictions: {has_nan_pred}")
+    
+    # Create valid mask (where both arrays have good values)
+    valid_indices = ~np.isnan(ball_positions).any(axis=1) & ~np.isnan(denorm_predictions).any(axis=1)
+    
+    # Filter out NaN values for comparison
+    ball_positions_valid = ball_positions[valid_indices]
+    denorm_predictions_valid = denorm_predictions[valid_indices]
+    
+    print(f"Original data points: {len(ball_positions)}")
+    print(f"Valid data points for comparison: {len(ball_positions_valid)}")
+    
+    # Compare with original (only on valid indices)
+    if len(ball_positions_valid) > 0:
+        mse_original = mean_squared_error(ball_positions_valid, denorm_predictions_valid)
+        mae_original = mean_absolute_error(ball_positions_valid, denorm_predictions_valid)
         
-        return splits, adj_matrix, node_features
+        print(f"Denormalized metrics:")
+        print(f"MSE: {mse_original:.6f}")
+        print(f"MAE: {mae_original:.6f}")
         
-    except Exception as e:
-        print(f"Error in prepare_football_data_for_mtgnn: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise
+        # Visualize
+        plt.figure(figsize=(12, 10))
+        
+        # Limit to 100 points for clarity
+        display_limit = min(100, len(ball_positions_valid))
+        
+        # Plot actual positions
+        plt.plot(ball_positions_valid[:display_limit, 0], ball_positions_valid[:display_limit, 1], 
+                'b-', label='Actual Path')
+        plt.scatter(ball_positions_valid[:display_limit, 0], ball_positions_valid[:display_limit, 1], 
+                    c='blue', alpha=0.6, label='Actual Positions')
+        
+        # Plot predicted positions
+        plt.plot(denorm_predictions_valid[:display_limit, 0], denorm_predictions_valid[:display_limit, 1], 
+                'r--', label='Predicted Path')
+        plt.scatter(denorm_predictions_valid[:display_limit, 0], denorm_predictions_valid[:display_limit, 1], 
+                    c='red', alpha=0.6, label='Predicted Positions')
+        
+        plt.title(f'Ball Position: Actual vs Predicted (First {display_limit} points)')
+        plt.xlabel('X Position')
+        plt.ylabel('Y Position')
+        plt.legend()
+        plt.grid(True)
+        
+        # Save the plot
+        plt.savefig('ball_position_comparison.png')
+        print("Saved comparison visualization to ball_position_comparison.png")
+    else:
+        print("ERROR: No valid data points for comparison after filtering NaN values")
+        print("Possible solutions:")
+        print("1. Check the ball position data in the original CSV")
+        print("2. Verify the denormalization process is working correctly")
+        print("3. Try using a different normalization approach")
+
+def main():
+    """Main function"""
+    print("=== Football Data Normalization Fix ===")
+    print("This script fixes normalization issues in the football prediction model")
+    print("\nWhat would you like to do?")
+    print("1. Train model with fixed normalization")
+    print("2. Evaluate model with proper denormalization")
+    print("3. Both train and evaluate")
+    
+    choice = input("Enter your choice (1-3): ").strip()
+    
+    if choice == '1':
+        train_model()
+    elif choice == '2':
+        evaluate_model()
+    elif choice == '3':
+        train_model()
+        evaluate_model()
+    else:
+        print("Invalid choice. Please enter 1, 2, or 3.")
+
+if __name__ == "__main__":
+    main()
